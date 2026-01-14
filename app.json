@@ -1,5 +1,5 @@
 {
-  "expo": {
+  "expo": { 
     "name": "SplitMate",
     "slug": "SplitMate",
     "version": "1.0.0",
@@ -9,7 +9,8 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.SplitMate"
     },
     "android": {
       "adaptiveIcon": {
@@ -19,10 +20,10 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.anonymous.SplitMate"
     },
     "web": {
-      "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
@@ -38,11 +39,25 @@
             "backgroundColor": "#000000"
           }
         }
+      ],
+      "expo-secure-store",
+      "expo-web-browser",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps._some_id_here_"
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "77374330-bb3e-4d37-98e8-e0c7b8ecf704"
+      }
     }
   }
 }
