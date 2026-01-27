@@ -1,5 +1,5 @@
 {
-  "expo": { 
+  "expo": {
     "name": "SplitMate",
     "slug": "SplitMate",
     "version": "1.0.0",
@@ -21,7 +21,8 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.SplitMate"
+      "package": "com.anonymous.SplitMate",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
@@ -47,14 +48,18 @@
         {
           "iosUrlScheme": "com.googleusercontent.apps._some_id_here_"
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
     "extra": {
-      "router": {},
+      "router": {
+        "root": "app"
+      },
       "eas": {
         "projectId": "77374330-bb3e-4d37-98e8-e0c7b8ecf704"
       }

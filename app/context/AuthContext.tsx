@@ -1,163 +1,181 @@
 import { useAuthStore } from "@/store/auth.store";
-import { GoogleSignin, isErrorWithCode, isSuccessResponse, statusCodes } from '@react-native-google-signin/google-signin';
-import { createContext, PropsWithChildren, use, useState } from "react";
-import Toast from 'react-native-toast-message';
+import {
+  GoogleSignin,
+  isErrorWithCode,
+  isSuccessResponse,
+  statusCodes,
+} from "@react-native-google-signin/google-signin";
+import {
+  GoogleAuthProvider,
+  onAuthStateChanged,
+  signInWithCredential,
+  signOut,
+} from "firebase/auth";
+
+import { auth } from "@/firebase/firebaseConfig";
+import { createUser } from "@/firebase/services/user.service";
+import {
+  createContext,
+  PropsWithChildren,
+  use,
+  useEffect,
+  useState,
+} from "react";
+import Toast from "react-native-toast-message";
 const AuthContext = createContext<{
-    // signIn: () => void;
-    signInWithGoogle: () => void;
-    signOut: () => void;
-    validateUser: () => void;
-    session?: string | null;
-    isLoading: boolean;
+  signInWithGoogle: () => void;
+  signOut: () => void;
+  session?: string | null;
+  isLoading: boolean;
 }>({
-    // signIn: () => null,
-    signInWithGoogle: () => null,
-    signOut: () => null,
-    validateUser: () => null,
-    session: null,
-    isLoading: false,
+  signInWithGoogle: () => null,
+  signOut: () => null,
+  session: null,
+  isLoading: false,
 });
 
+import registerForPushNotificationsAsync from "@/utils/registerForPush";
+import * as Notifications from "expo-notifications";
 
 export function useSession() {
-    const value = use(AuthContext);
-    if (!value) {
-        throw new Error('useSession must be wrapped in a <SessionProvider />');
-    }
-    return value;
+  const value = use(AuthContext);
+  if (!value) {
+    throw new Error("useSession must be wrapped in a <SessionProvider />");
+  }
+  return value;
 }
 
-
-
 export default function SessionProvider({ children }: PropsWithChildren) {
-    const [loading, setloading] = useState(false)
+  const [loading, setloading] = useState(true);
 
+  const [notification, setNotification] = useState<
+    Notifications.Notification | undefined
+  >(undefined);
 
-    const { login, logout, token, data, checkAuth } = useAuthStore();
+  useEffect(() => {
+    const notificationListener = Notifications.addNotificationReceivedListener(
+      (notification) => {
+        setNotification(notification);
+      },
+    );
 
-    const signInWithGoogle = async () => {
-        try {
-            await GoogleSignin.hasPlayServices();
-            const response = await GoogleSignin.signIn();
-            if (isSuccessResponse(response)) {
-                const idToken = response.data.idToken;
+    const responseListener =
+      Notifications.addNotificationResponseReceivedListener((response) => {
+        console.log(response);
+      });
 
-                console.log('coming', process.env.EXPO_PUBLIC_BASE_API_URL)
-                const res = await fetch(process.env.EXPO_PUBLIC_BASE_API_URL + "/auth/login", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ idToken }),
-                });
+    return () => {
+      notificationListener.remove();
+      responseListener.remove();
+    };
+  }, []);
 
-                let result = await res.json();
-                if (!res.ok) {
-                    throw new Error(result.message || "Login failed");
-                }
-                await login(result.token, result.user);
-            } else {
-                Toast.show({
-                    type: 'info',
-                    text1: 'Login cancelled',
-                    text2: 'Google sign-in was cancelled',
-                    position: 'bottom',
-                });
-                console.log('cancel')
-            }
-        } catch (error) {
-            if (isErrorWithCode(error)) {
-                switch (error.code) {
-                    case statusCodes.IN_PROGRESS:
-                        Toast.show({
-                            type: 'info',
-                            text1: 'Please wait',
-                            text2: 'Sign-in already in progress',
-                            position: 'bottom',
-                        });
-                        break;
+  useEffect(() => {
+    GoogleSignin.configure({
+      webClientId:
+        "760399815016-pvion1p1redgn5904m2n4uejsdlb3qj2.apps.googleusercontent.com",
+      profileImageSize: 500,
+    });
+  }, []);
 
-                    case statusCodes.PLAY_SERVICES_NOT_AVAILABLE:
-                        Toast.show({
-                            type: 'error',
-                            text1: 'Google Services Error',
-                            text2: 'Google Play Services not available',
-                            position: 'bottom',
-                        });
-                        break;
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        useAuthStore.getState().setUser(user);
+      } else {
+        useAuthStore.getState().setUser(null);
+      }
+      setloading(false);
+    });
 
-                    default:
-                        Toast.show({
-                            type: 'error',
-                            text1: 'Login failed',
-                            text2: 'Something went wrong',
-                            position: 'bottom',
-                        });
-                        console.log(error);
-                }
-            } else {
-                Toast.show({
-                    type: 'error',
-                    text1: 'Unexpected error',
-                    text2: 'Please try again later',
-                    position: 'bottom',
-                });
-                console.log(error);
-            }
+    return unsubscribe;
+  }, []);
+
+  const signInWithGoogle = async () => {
+    try {
+      await GoogleSignin.hasPlayServices({
+        showPlayServicesUpdateDialog: true,
+      });
+      const response = await GoogleSignin.signIn();
+      if (isSuccessResponse(response)) {
+        const idToken = response.data.idToken ?? "";
+
+        const credential = GoogleAuthProvider.credential(response.data.idToken);
+
+        const userCredential = await signInWithCredential(auth, credential);
+
+        const notToken = await registerForPushNotificationsAsync();
+
+        await createUser(userCredential.user, notToken ?? "");
+      } else {
+        Toast.show({
+          type: "info",
+          text1: "Login cancelled",
+          text2: "Google sign-in was cancelled",
+          position: "bottom",
+        });
+        console.log("cancel");
+      }
+    } catch (error) {
+      if (isErrorWithCode(error)) {
+        switch (error.code) {
+          case statusCodes.IN_PROGRESS:
+            Toast.show({
+              type: "info",
+              text1: "Please wait",
+              text2: "Sign-in already in progress",
+              position: "bottom",
+            });
+            break;
+
+          case statusCodes.PLAY_SERVICES_NOT_AVAILABLE:
+            Toast.show({
+              type: "error",
+              text1: "Google Services Error",
+              text2: "Google Play Services not available",
+              position: "bottom",
+            });
+            break;
+
+          default:
+            console.log("erorr", statusCodes);
+            Toast.show({
+              type: "error",
+              text1: "Login failed",
+              text2: "Something went wrong",
+              position: "bottom",
+            });
         }
-
+      } else {
+        Toast.show({
+          type: "error",
+          text1: "Unexpected error",
+          text2: "Please try again later",
+          position: "bottom",
+        });
+        console.log(error);
+      }
     }
+  };
 
-    const signOutGoogle = async () => {
-        try {
-            await GoogleSignin.signOut();
-            await logout();
-        } catch (error) {
-            console.error(error);
-        }
+  const signOutGoogle = async () => {
+    try {
+      await GoogleSignin.signOut();
+      await signOut(auth);
+    } catch (error) {
+      console.error(error);
     }
+  };
 
-    const validateUser = async () => {
-        setloading(true);
-        const authData: any = await checkAuth();
-        // return;
-        try {
-            const res = await fetch(
-                `${process.env.EXPO_PUBLIC_BASE_API_URL}/me`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${authData.token}`,
-                    },
-                }
-            );
-            if (!res.ok) {
-                await logout();
-                throw new Error("Unauthorized");
-            }
-
-            const serverUser = await res.json();
-            if (serverUser._id !== authData.data._id) {
-                console.warn("User mismatch detected");
-                await logout();
-            }
-            return serverUser;
-
-        } catch (error) {
-            console.warn("User has error", error);
-            await logout();
-            // throw new Error("User mismatch");
-        } finally {
-            setloading(false);
-        }
-    }
-
-    return <AuthContext.Provider
-        value={{
-            // signIn: login,
-            signInWithGoogle: signInWithGoogle,
-            validateUser: validateUser,
-            signOut: signOutGoogle,
-            session: token,
-            isLoading: loading,
-        }}>
-        {children}
-    </ AuthContext.Provider>
+  return (
+    <AuthContext.Provider
+      value={{
+        signInWithGoogle: signInWithGoogle,
+        signOut: signOutGoogle,
+        isLoading: loading,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 }
