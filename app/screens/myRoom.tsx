@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
+  Alert,
   Image,
   Modal,
   ScrollView,
@@ -12,25 +13,28 @@ import {
 } from "react-native";
 
 import { auth, db } from "@/firebase/firebaseConfig";
+import { useAppStore } from "@/store/app.store";
 import { doc, updateDoc } from "firebase/firestore";
 import Toast from "react-native-toast-message";
 
 export default function ManageRoomScreen(roomData: any) {
   const user = auth.currentUser;
-  const { room, fetchRoom } = roomData;
+  const { room, roomId, fetchRoom, roommate } = useAppStore();
+
   const [showTargetModal, setShowTargetModal] = useState(false);
   const [targetAmount, setTargetAmount] = useState(
     room.targetAmount?.toString() || "1000",
   );
   const [saving, setSaving] = useState(false);
   const [leaving, setleaving] = useState(false);
+
   const updateTarget = async () => {
-    if (!targetAmount) return;
+    if (!targetAmount || !roomId) return;
 
     try {
       setSaving(true);
 
-      await updateDoc(doc(db, "rooms", room.id), {
+      await updateDoc(doc(db, "rooms", roomId), {
         targetAmount: Number(targetAmount),
         updatedAt: new Date(),
       });
@@ -52,41 +56,57 @@ export default function ManageRoomScreen(roomData: any) {
     }
   };
 
-  const leaveRoom = async () => {
+  const leaveRoom = () => {
     if (!room) return;
 
-    if (user?.uid != room.ownerId) {
-      Toast.show({
-        type: "error",
-        text1: "Only owner can delete the room",
-        text2: "Contact your roommate to delete the room",
-      });
-      return;
-    }
-    try {
-      setleaving(true);
-      await updateDoc(doc(db, "rooms", room.id), {
-        status: "inactive",
-        leftAt: new Date(),
-      });
+    Alert.alert(
+      "Leave Room?",
+      "This will delete the room for both you and your roommate and remove all the expenses on this room. This action cannot be undone.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Leave",
+          style: "destructive",
+          onPress: async () => {
+            if (user?.uid !== room.ownerId) {
+              Toast.show({
+                type: "error",
+                text1: "Only owner can delete the room",
+                text2: "Contact your roommate to delete the room",
+              });
+              return;
+            }
+            try {
+              setleaving(true);
 
-      Toast.show({
-        type: "success",
-        text1: "Left room",
-        text2: "You have left the room successfully",
-      });
+              await updateDoc(doc(db, "rooms", room.id), {
+                status: "inactive",
+                leftAt: new Date(),
+              });
 
-      // Parent RoomScreen will auto-refresh on pull / remount
-    } catch (error) {
-      console.error(error);
-      Toast.show({
-        type: "error",
-        text1: "Failed to leave room",
-      });
-    } finally {
-      fetchRoom();
-      setleaving(false);
-    }
+              Toast.show({
+                type: "success",
+                text1: "Room left",
+                text2: "You have left the room successfully",
+              });
+            } catch (error) {
+              console.error(error);
+              Toast.show({
+                type: "error",
+                text1: "Failed to leave room",
+              });
+            } finally {
+              fetchRoom();
+              setleaving(false);
+            }
+          },
+        },
+      ],
+      { cancelable: true },
+    );
   };
 
   return (
@@ -128,12 +148,16 @@ export default function ManageRoomScreen(roomData: any) {
           </View>
 
           <TouchableOpacity style={styles.userRow}>
+            {roommate?.photoURL && (
+              <Image
+                source={{ uri: roommate?.photoURL }}
+                style={styles.avatar}
+              />
+            )}
             <View style={{ flex: 1 }}>
               <Text style={styles.userRole}>ROOMMATE</Text>
               <Text style={styles.userEmail}>
-                {user?.email == room.ownerEmail
-                  ? room.roommateEmail
-                  : room.ownerEmail}
+                {roommate.email || "Not Assigned"}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />

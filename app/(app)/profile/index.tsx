@@ -1,16 +1,8 @@
 import { useSession } from "@/app/context/AuthContext";
-import { auth, db } from "@/firebase/firebaseConfig";
+import { auth } from "@/firebase/firebaseConfig";
+import { useAppStore } from "@/store/app.store";
 import { Ionicons } from "@expo/vector-icons";
-import { onAuthStateChanged, User } from "firebase/auth";
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  where,
-} from "firebase/firestore";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import {
   Image,
   RefreshControl,
@@ -24,59 +16,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ProfileScreen() {
   const { signOut } = useSession();
-  const [user, setUser] = useState<User | null>(null);
-  const [room, setRoom] = useState<any>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const fetchRoom = async () => {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    try {
-      setRefreshing(true);
-      const roomSnap = await getDocs(
-        query(
-          collection(db, "rooms"),
-          where("participants", "array-contains", user.uid),
-          where("status", "==", "active"),
-        ),
-      );
-
-      if (!roomSnap.empty) {
-        const roomSnapDt = roomSnap.docs[0];
-        const roomData = roomSnapDt.data();
-        let roommateId = "";
-
-        if (user.email == roomData.ownerEmail) {
-          roommateId = roomData.roommateId;
-        } else {
-          roommateId = roomData.ownerId;
-        }
-        const userSnap = await getDoc(doc(db, "users", roommateId));
-        setRoom({
-          id: roomSnapDt.id,
-          ...roomSnapDt.data(),
-          userData: userSnap.data(),
-        });
-      } else {
-        setRoom(null);
-      }
-    } catch (error) {
-      console.error("Fetch room error:", error);
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-    });
-
-    fetchRoom();
-    return unsub;
-  }, []);
-
-  if (!user) return null; // or loader
+  const { room, roomLoading, fetchRoom, roommate } = useAppStore();
+  const user = auth.currentUser;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -90,7 +31,7 @@ export default function ProfileScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={fetchRoom} />
+          <RefreshControl refreshing={roomLoading} onRefresh={fetchRoom} />
         }
       >
         {/* Avatar */}
@@ -99,9 +40,9 @@ export default function ProfileScreen() {
             <Image
               source={{
                 uri:
-                  user.photoURL ??
+                  user?.photoURL ??
                   "https://ui-avatars.com/api/?name=" +
-                    encodeURIComponent(user.displayName ?? "User"),
+                    encodeURIComponent(user?.displayName ?? "User"),
               }}
               style={styles.avatar}
             />
@@ -110,8 +51,8 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          <Text style={styles.name}>{user.displayName ?? "Unnamed User"}</Text>
-          <Text style={styles.email}>{user.email}</Text>
+          <Text style={styles.name}>{user?.displayName ?? "Unnamed User"}</Text>
+          <Text style={styles.email}>{user?.email}</Text>
         </View>
 
         {/* Status Card */}
@@ -130,7 +71,7 @@ export default function ProfileScreen() {
           <View style={styles.statusItem}>
             <Text style={styles.statusLabel}>ROOMMATE</Text>
             <Text style={styles.statusValue}>
-              {room?.userData?.name || "Not Assigned"}
+              {roommate.name || "Not Assigned"}
             </Text>
           </View>
         </View>

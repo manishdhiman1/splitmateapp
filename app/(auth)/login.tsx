@@ -1,5 +1,4 @@
-import { useFonts } from "expo-font";
-import React, { useEffect } from "react";
+import React from "react";
 import {
   Image,
   StatusBar,
@@ -14,22 +13,6 @@ import { useSession } from "../context/AuthContext";
 const Login = () => {
   const { signInWithGoogle } = useSession();
 
-  const [loaded, error] = useFonts({
-    PJS: require("../../assets/fonts/Plus_Jakarta_Sans/PlusJakartaSans-Regular.ttf"),
-    "PJS-Bold": require("../../assets/fonts/Plus_Jakarta_Sans/PlusJakartaSans-Bold.ttf"),
-  });
-
-  useEffect(() => {
-    if (loaded || error) {
-      // console.log("env", process.env.GOOGLE_CLIENT_ID)
-    }
-  }, [loaded, error]);
-
-  if (!loaded && !error) {
-    return null;
-  }
-
-  // console.log("loaded, error" , loaded, error)
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" />
@@ -44,19 +27,10 @@ const Login = () => {
         </View>
 
         {/* Title */}
-        <Text style={styles.title}>SplitMate</Text>
+        <Text style={styles.title}>Living Expense</Text>
         <Text style={styles.subtitle}>
           The easiest way to track roommate expenses.
         </Text>
-
-        {/* Dots */}
-        {/* <View style={styles.dots}>
-          <View style={styles.dot} />
-          <View style={styles.dot} />
-          <View style={[styles.dot, styles.dotActive]}>
-            <Text style={styles.dotText}>+2</Text>
-          </View>
-        </View> */}
 
         {/* Google Button */}
         <TouchableOpacity
@@ -97,28 +71,26 @@ const styles = StyleSheet.create({
   },
 
   iconWrapper: {
-    width: 72,
-    height: 72,
+    width: 120,
+    height: 120,
     borderRadius: 20,
-    backgroundColor: "#5B5FEF",
+    // backgroundColor: "#5B5FEF",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 20,
+    // marginBottom: 20,
   },
   icon: {
-    width: 36,
-    height: 36,
-    tintColor: "#fff",
+    width: "100%",
+    height: "100%",
+    // tintColor: "#fff",
   },
 
   title: {
     fontSize: 28,
-    fontFamily: "PJS-Bold",
     color: "#0F172A",
   },
   subtitle: {
     fontSize: 15,
-    fontFamily: "PJS",
     color: "#64748B",
     textAlign: "center",
     marginTop: 8,
@@ -146,7 +118,6 @@ const styles = StyleSheet.create({
   dotText: {
     fontSize: 10,
     color: "#64748B",
-    fontFamily: "PJS-Bold",
   },
 
   googleBtn: {
@@ -168,7 +139,6 @@ const styles = StyleSheet.create({
   },
   googleText: {
     fontSize: 16,
-    fontFamily: "PJS-Bold",
     color: "#111827",
   },
 
@@ -180,6 +150,5 @@ const styles = StyleSheet.create({
   },
   link: {
     color: "#5B5FEF",
-    fontFamily: "PJS-Bold",
   },
 });

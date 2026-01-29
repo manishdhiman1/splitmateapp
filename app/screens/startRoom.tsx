@@ -36,6 +36,15 @@ export default function StartRoomScreen(roomData: any) {
     }
 
     const user = auth.currentUser;
+    if (user?.email == roommateEmail) {
+      Toast.show({
+        type: "error",
+        text1: "Cannot invite yourself",
+        text2: "Please enter your roommate's email. Or ask them to invite you.",
+      });
+      return;
+    }
+
     if (!user) {
       Toast.show({
         type: "error",

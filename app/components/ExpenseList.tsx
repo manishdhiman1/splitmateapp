@@ -8,7 +8,8 @@ import {
 } from "react-native";
 
 import ExpenseCard from "@/app/components/ExpenseCard";
-import { auth, db } from "@/firebase/firebaseConfig";
+import { db } from "@/firebase/firebaseConfig";
+import { useAppStore } from "@/store/app.store";
 import { Ionicons } from "@expo/vector-icons";
 import {
   collection,
@@ -22,12 +23,15 @@ import {
 import { useEffect, useState } from "react";
 import AddExpenses from "./AddExpense";
 
-const ExpenseList = ({ room, fetchCycleTotal }: any) => {
-  const user = auth.currentUser;
+const ExpenseList = ({
+  fetchCycleTotal,
+  loadingExpenses,
+  setLoadingExpenses,
+}: any) => {
+  const { room, roomId } = useAppStore();
   const [showExpenseModal, setShowExpenseModal] = useState(false);
 
   const [expenses, setExpenses] = useState<any[]>([]);
-  const [loadingExpenses, setLoadingExpenses] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [lastDoc, setLastDoc] = useState<any>(null);
   const [hasMore, setHasMore] = useState(true);
@@ -43,7 +47,7 @@ const ExpenseList = ({ room, fetchCycleTotal }: any) => {
   };
 
   const fetchExpenses = async () => {
-    if (!room?.id) return;
+    if (!roomId) return;
 
     try {
       setLoadingExpenses(true);
@@ -51,7 +55,7 @@ const ExpenseList = ({ room, fetchCycleTotal }: any) => {
 
       const q = query(
         collection(db, "expenses"),
-        where("roomId", "==", room.id),
+        where("roomId", "==", roomId),
         // where("roomId", "==", "dfsdf"),
         orderBy("expenseDate", "desc"),
         limit(PAGE_SIZE),
@@ -72,23 +76,24 @@ const ExpenseList = ({ room, fetchCycleTotal }: any) => {
       console.error("Fetch expenses error:", error);
     } finally {
       setLoadingExpenses(false);
-      fetchCycleTotal();
+      // console.log("room", room);
+      fetchCycleTotal(room);
     }
   };
 
   useEffect(() => {
     fetchExpenses();
-  }, [room?.id]);
+  }, [roomId]);
 
   const fetchMoreExpenses = async () => {
-    if (!room?.id || !lastDoc || !hasMore || loadingMore) return;
+    if (!roomId || !lastDoc || !hasMore || loadingMore) return;
 
     try {
       setLoadingMore(true);
 
       const q = query(
         collection(db, "expenses"),
-        where("roomId", "==", room.id),
+        where("roomId", "==", roomId),
         // where("roomId", "==", "sdfsdf"),
         orderBy("expenseDate", "desc"),
         startAfter(lastDoc),

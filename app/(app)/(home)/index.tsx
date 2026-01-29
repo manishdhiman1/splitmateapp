@@ -19,6 +19,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import ExpenseList from "@/app/components/ExpenseList";
 import { db } from "@/firebase/firebaseConfig";
+import { useAppStore } from "@/store/app.store";
 import registerForPushNotificationsAsync from "@/utils/registerForPush";
 import * as Notifications from "expo-notifications";
 import { router } from "expo-router";
@@ -47,17 +48,10 @@ Notifications.setNotificationHandler({
 
 export default function HomeScreen() {
   const user = auth.currentUser;
-  const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const { room, roomId, roommateId, fetchRoom } = useAppStore();
 
-  const [room, setRoom] = useState<any>(null);
-
-  const [expenses, setExpenses] = useState<any[]>([]);
   const [loadingExpenses, setLoadingExpenses] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [lastDoc, setLastDoc] = useState<any>(null);
-  const [hasMore, setHasMore] = useState(true);
 
-  const [isCycleActive, setIsCycleActive] = useState(false);
   const [isMyTurn, setIsMyTurn] = useState(false);
   const [canStartCycle, setCanStartCycle] = useState(false);
 
@@ -68,39 +62,28 @@ export default function HomeScreen() {
 
   useEffect(() => {
     if (!room || !user) {
-      setIsCycleActive(false);
       setIsMyTurn(false);
       setCanStartCycle(false);
       return;
     }
     const cycleActive = !!room.activeUserId && !!room.cycleStartAt;
 
-    setIsCycleActive(cycleActive);
-
     setIsMyTurn(cycleActive && room.activeUserId === user.uid);
 
     setCanStartCycle(!room.activeUserId && !room.cycleStartAt);
   }, [room, user]);
 
-  const fetchCycleTotal = async () => {
-    if (!room?.id || !room?.activeUserId || !room?.cycleStartAt) {
+  const fetchCycleTotal = async (room: any) => {
+    if (!roomId || !room?.activeUserId || !room?.cycleStartAt) {
       setCycleTotal(0);
       return;
     }
-
     try {
       setCycleTotalLoading(true);
 
-      let roomMateId = "";
-      if (room.ownerId === user?.uid) {
-        roomMateId = room.roommateId;
-      } else {
-        roomMateId = room.ownerId;
-      }
-
       const myQuery = query(
         collection(db, "expenses"),
-        where("roomId", "==", room.id),
+        where("roomId", "==", roomId),
         where("cycleUserId", "==", room.activeUserId),
         where("paidBy", "==", user?.uid),
         where("createdAt", ">=", room.cycleStartAt),
@@ -108,8 +91,8 @@ export default function HomeScreen() {
 
       const roommateQuery = query(
         collection(db, "expenses"),
-        where("roomId", "==", room.id),
-        where("paidBy", "==", roomMateId),
+        where("roomId", "==", roomId),
+        where("paidBy", "==", roommateId),
         where("cycleUserId", "==", room.activeUserId),
         where("createdAt", ">=", room.cycleStartAt),
       );
@@ -142,8 +125,8 @@ export default function HomeScreen() {
   };
 
   useEffect(() => {
-    fetchCycleTotal();
-  }, [room, expenses]);
+    fetchCycleTotal(room);
+  }, [room]);
 
   const target = room?.targetAmount || 0;
 
@@ -153,11 +136,11 @@ export default function HomeScreen() {
     target > 0 ? Math.min((cycleTotal / target) * 100, 100) : 0;
 
   const startCycle = async () => {
-    if (!user || !room?.id) return;
+    if (!user || !roomId) return;
 
     try {
       setCycleLoading(true);
-      await updateDoc(doc(db, "rooms", room.id), {
+      await updateDoc(doc(db, "rooms", roomId), {
         activeUserId: user.uid,
         activeUserEmail: user.email,
         cycleStartAt: serverTimestamp(),
@@ -182,7 +165,7 @@ export default function HomeScreen() {
   };
 
   const completeCycle = async () => {
-    if (!room?.id || !user) return;
+    if (!roomId || !user) return;
 
     const nextUser =
       room.ownerId === user.uid
@@ -207,7 +190,7 @@ export default function HomeScreen() {
     try {
       setCycleLoading(true);
       console.log("data", nextUser);
-      await updateDoc(doc(db, "rooms", room.id), {
+      await updateDoc(doc(db, "rooms", roomId), {
         activeUserId: nextUser.uid,
         activeUserEmail: nextUser.email,
         cycleStartAt: serverTimestamp(),
@@ -230,41 +213,8 @@ export default function HomeScreen() {
     }
   };
 
-  const fetchRoom = async () => {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    try {
-      setLoadingExpenses(true);
-
-      const roomSnap = await getDocs(
-        query(
-          collection(db, "rooms"),
-          where("participants", "array-contains", user.uid),
-          where("status", "==", "active"),
-        ),
-      );
-
-      if (!roomSnap.empty) {
-        const doc = roomSnap.docs[0];
-
-        setRoom({
-          id: doc.id, // ✅ roomId
-          ...doc.data(), // ✅ room data
-        });
-      } else {
-        setRoom(null);
-      }
-    } catch (error) {
-      console.error("Fetch room error:", error);
-    } finally {
-      setLoadingExpenses(false);
-    }
-  };
-
   useEffect(() => {
     if (!user?.uid) return;
-    fetchRoom();
     handleNotify();
   }, []);
 
@@ -325,29 +275,15 @@ export default function HomeScreen() {
   }
 
   async function schedulePushNotification() {
-    console.log("not sent");
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: "You've got mail! 📬",
-        body: "Here is the notification body",
+        title: "You've got notification",
+        body: "Here is the notification test body",
         data: { data: "goes here", test: { test1: "more data" } },
       },
       trigger: null,
     });
   }
-
-  if (loadingExpenses) {
-    return (
-      <SafeAreaView
-        style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
-      >
-        <StatusBar barStyle="dark-content" />
-        <ActivityIndicator size="large" color="#4F46E5" />
-        <Text style={{ marginTop: 10, color: "#6B7280" }}>Loading Data...</Text>
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
@@ -549,7 +485,11 @@ export default function HomeScreen() {
                 )}
               </View>
             </View>
-            <ExpenseList room={room} fetchCycleTotal={fetchCycleTotal} />
+            <ExpenseList
+              fetchCycleTotal={fetchCycleTotal}
+              loadingExpenses={loadingExpenses}
+              setLoadingExpenses={setLoadingExpenses}
+            />
           </>
         )}
       </>

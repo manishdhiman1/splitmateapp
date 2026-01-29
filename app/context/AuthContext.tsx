@@ -34,6 +34,7 @@ const AuthContext = createContext<{
   isLoading: false,
 });
 
+import { GOOGLE_CLIENT_ID } from "@/utils/constants";
 import registerForPushNotificationsAsync from "@/utils/registerForPush";
 import * as Notifications from "expo-notifications";
 
@@ -72,8 +73,7 @@ export default function SessionProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     GoogleSignin.configure({
-      webClientId:
-        "760399815016-pvion1p1redgn5904m2n4uejsdlb3qj2.apps.googleusercontent.com",
+      webClientId: GOOGLE_CLIENT_ID,
       profileImageSize: 500,
     });
   }, []);

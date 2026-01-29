@@ -18,14 +18,6 @@ Notifications.setNotificationHandler({
 });
 
 export default function RootLayout() {
-  // Notifications.setNotificationHandler({
-  //   handleNotification: async () => ({
-  //     shouldShowAlert: true,
-  //     shouldPlaySound: true,
-  //     shouldSetBadge: false,
-  //   }),
-  // });
-
   return (
     <SessionProvider>
       <SplashScreenController />

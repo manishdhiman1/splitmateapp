@@ -21,14 +21,12 @@ import {
   collection,
   doc,
   getDoc,
-  getDocs,
-  query,
   serverTimestamp,
   updateDoc,
-  where,
 } from "firebase/firestore";
 import Toast from "react-native-toast-message";
 
+import { useAppStore } from "@/store/app.store";
 import sendExpensePush from "@/utils/notification";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
@@ -36,7 +34,7 @@ const AddExpenses = (expenseData: any) => {
   const { showExpenseModal, closeModal, fetchExpenses } = expenseData;
   const [amount, setAmount] = useState("0");
   const slideAnim = useRef(new Animated.Value(0)).current;
-
+  const { roomId, room } = useAppStore();
   const [expenseDate, setExpenseDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
 
@@ -136,22 +134,15 @@ const AddExpenses = (expenseData: any) => {
 
     try {
       setSavingExpense(true);
-      const roomSnap = await getDocs(
-        query(
-          collection(db, "rooms"),
-          where("participants", "array-contains", user.uid),
-          where("status", "==", "active"),
-        ),
-      );
       // 1️⃣ Add expense (TOP-LEVEL collection)
       await addDoc(collection(db, "expenses"), {
-        roomId: roomSnap.docs[0].id,
+        roomId: roomId,
         amount: Number(amount),
         category,
         note,
         paidBy: user.uid,
-        cycleNumber: roomSnap.docs[0].data().cycleNumber || null,
-        cycleUserId: roomSnap.docs[0].data().activeUserId || null,
+        cycleNumber: room.cycleNumber || null,
+        cycleUserId: room.activeUserId || null,
         paidByEmail: user.email,
         paidByName: user.displayName,
         expenseDate: expenseDate,
@@ -160,9 +151,10 @@ const AddExpenses = (expenseData: any) => {
       });
 
       // 2️⃣ Update room summary
-      await updateDoc(doc(db, "rooms", roomSnap.docs[0].id), {
-        lastExpenseAt: serverTimestamp(),
-      });
+      roomId &&
+        (await updateDoc(doc(db, "rooms", roomId), {
+          lastExpenseAt: serverTimestamp(),
+        }));
 
       Toast.show({
         type: "success",
@@ -171,10 +163,10 @@ const AddExpenses = (expenseData: any) => {
 
       let roommateId = "";
 
-      if (roomSnap.docs[0].data().ownerId === user.uid) {
-        roommateId = roomSnap.docs[0].data().roommateId;
+      if (room.ownerId === user.uid) {
+        roommateId = room.roommateId;
       } else {
-        roommateId = roomSnap.docs[0].data().ownerId;
+        roommateId = room.ownerId;
       }
 
       const roommateSnap = await getDoc(doc(db, "users", roommateId));
