@@ -20,6 +20,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import ExpenseList from "@/app/components/ExpenseList";
 import { db } from "@/firebase/firebaseConfig";
 import { useAppStore } from "@/store/app.store";
+import sendExpensePush from "@/utils/notification";
 import registerForPushNotificationsAsync from "@/utils/registerForPush";
 import * as Notifications from "expo-notifications";
 import { router } from "expo-router";
@@ -48,7 +49,7 @@ Notifications.setNotificationHandler({
 
 export default function HomeScreen() {
   const user = auth.currentUser;
-  const { room, roomId, roommateId, fetchRoom } = useAppStore();
+  const { room, roomId, roommateId, fetchRoom, roommate } = useAppStore();
 
   const [loadingExpenses, setLoadingExpenses] = useState(false);
 
@@ -202,6 +203,10 @@ export default function HomeScreen() {
         text1: "Cycle completed",
         text2: "Turn switched successfully",
       });
+
+      const token = roommate.notifyToken;
+
+      sendExpensePush([token], "It is your turn to pay", "Cycle completed 🎉");
     } catch (error) {
       console.error(error);
       Toast.show({

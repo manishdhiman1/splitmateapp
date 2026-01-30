@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Living Expense",
-    "slug": "livingexpense",
+    "slug": "SplitMate",
     "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -61,6 +61,7 @@
       "eas": {
         "projectId": "77374330-bb3e-4d37-98e8-e0c7b8ecf704"
       }
-    }
+    },
+    "owner": "manishdhiman118"
   }
 }

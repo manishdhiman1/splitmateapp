@@ -20,7 +20,6 @@ import {
   addDoc,
   collection,
   doc,
-  getDoc,
   serverTimestamp,
   updateDoc,
 } from "firebase/firestore";
@@ -34,7 +33,7 @@ const AddExpenses = (expenseData: any) => {
   const { showExpenseModal, closeModal, fetchExpenses } = expenseData;
   const [amount, setAmount] = useState("0");
   const slideAnim = useRef(new Animated.Value(0)).current;
-  const { roomId, room } = useAppStore();
+  const { roomId, room, roommate } = useAppStore();
   const [expenseDate, setExpenseDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
 
@@ -106,7 +105,7 @@ const AddExpenses = (expenseData: any) => {
     setAmount((prev) => (prev.length <= 1 ? "0" : prev.slice(0, -1)));
   };
 
-  const [category, setCategory] = useState("Food");
+  const [category, setCategory] = useState("Groceries");
   const [note, setNote] = useState("");
   const [savingExpense, setSavingExpense] = useState(false);
 
@@ -161,17 +160,7 @@ const AddExpenses = (expenseData: any) => {
         text1: "Expense added successfully",
       });
 
-      let roommateId = "";
-
-      if (room.ownerId === user.uid) {
-        roommateId = room.roommateId;
-      } else {
-        roommateId = room.ownerId;
-      }
-
-      const roommateSnap = await getDoc(doc(db, "users", roommateId));
-
-      const token = roommateSnap.data()?.notifyToken;
+      const token = roommate.notifyToken;
 
       sendExpensePush(
         [token],
@@ -241,40 +230,11 @@ const AddExpenses = (expenseData: any) => {
               <Ionicons name="close" size={20} onPress={handleClose} />
             </View>
 
-            {/* Amount */}
-            <View style={styles.amountRow}>
-              <Text style={styles.currency}>₹</Text>
-              <Text style={styles.amount}>{amount}</Text>
-            </View>
-            <View style={styles.keypad}>
-              {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((n) => (
-                <TouchableOpacity
-                  key={n}
-                  style={styles.key}
-                  onPress={() => onNumberPress(n)}
-                >
-                  <Text style={styles.keyText}>{n}</Text>
-                </TouchableOpacity>
-              ))}
-
-              <View style={styles.key} />
-
-              <TouchableOpacity
-                style={styles.key}
-                onPress={() => onNumberPress("0")}
-              >
-                <Text style={styles.keyText}>0</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.key} onPress={onBackspace}>
-                <Ionicons name="backspace-outline" size={22} />
-              </TouchableOpacity>
-            </View>
             {/* Category */}
             <Text style={styles.sheetLabel}>Category</Text>
 
             <View style={styles.categoryRow}>
-              {["Food", "Rent", "Travel", "Other"].map((item) => (
+              {["Groceries", "Rent", "Travel", "Other"].map((item) => (
                 <TouchableOpacity
                   key={item}
                   style={[
@@ -285,7 +245,7 @@ const AddExpenses = (expenseData: any) => {
                 >
                   <Ionicons
                     name={
-                      item === "Food"
+                      item === "Groceries"
                         ? "fast-food"
                         : item === "Rent"
                           ? "home"
@@ -321,6 +281,7 @@ const AddExpenses = (expenseData: any) => {
             {/* Date */}
             <View style={styles.dateRow}>
               {/* Date */}
+              <Text>Date: </Text>
               <TouchableOpacity
                 style={styles.dateRow}
                 onPress={() => setShowDatePicker(true)}
@@ -345,6 +306,35 @@ const AddExpenses = (expenseData: any) => {
               />
             )}
 
+            {/* Amount */}
+            <View style={styles.amountRow}>
+              <Text style={styles.currency}>₹</Text>
+              <Text style={styles.amount}>{amount}</Text>
+            </View>
+            <View style={styles.keypad}>
+              {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((n) => (
+                <TouchableOpacity
+                  key={n}
+                  style={styles.key}
+                  onPress={() => onNumberPress(n)}
+                >
+                  <Text style={styles.keyText}>{n}</Text>
+                </TouchableOpacity>
+              ))}
+
+              <View style={styles.key} />
+
+              <TouchableOpacity
+                style={styles.key}
+                onPress={() => onNumberPress("0")}
+              >
+                <Text style={styles.keyText}>0</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.key} onPress={onBackspace}>
+                <Ionicons name="backspace-outline" size={22} />
+              </TouchableOpacity>
+            </View>
             {/* Save */}
             <TouchableOpacity
               style={[styles.saveButton, savingExpense && { opacity: 0.6 }]}
@@ -464,7 +454,8 @@ const styles = StyleSheet.create({
   dateRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 20,
+    // paddingBottom:
+    // marginBottom: 20,
   },
 
   dateText: {

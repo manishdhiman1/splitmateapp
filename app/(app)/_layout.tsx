@@ -25,7 +25,10 @@ export default function TabLayout() {
   }
 
   return (
-    <Tabs screenOptions={{ headerShown: false }}>
+    <Tabs
+      screenOptions={{ headerShown: false }}
+      // initialRouteName="reminders/index"
+    >
       <Tabs.Screen
         name="(home)/index"
         options={{
@@ -46,6 +49,15 @@ export default function TabLayout() {
         }}
       />
 
+      <Tabs.Screen
+        name="reminders/index"
+        options={{
+          title: "Reminders",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="alarm" size={size} color={color} />
+          ),
+        }}
+      />
       <Tabs.Screen
         name="profile/index"
         options={{
