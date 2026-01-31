@@ -1,6 +1,10 @@
+import { auth, db } from "@/firebase/firebaseConfig";
 import { Ionicons } from "@expo/vector-icons";
+import { deleteDoc, doc } from "firebase/firestore";
 import { useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Modal,
   Pressable,
   StyleSheet,
@@ -18,8 +22,45 @@ function DetailRow({ label, value }: any) {
   );
 }
 
-export default function ExpenseCard({ expense }: any) {
+export default function ExpenseCard({ expense, fetchExpenses }: any) {
   const [visible, setVisible] = useState(false);
+  const user = auth.currentUser;
+  const [deleting, setDeleting] = useState(false);
+
+  const deleteExpense = () => {
+    if (expense.paidBy != user?.uid) {
+      alert(
+        "You can only delete your expenses. Ask your roommate to delete this expense. ",
+      );
+      return;
+    }
+    Alert.alert(
+      "Delete Expense",
+      "Are you sure you want to delete this expense?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setDeleting(true);
+              await deleteDoc(doc(db, "expenses", expense.id));
+              setVisible(false);
+              fetchExpenses();
+            } catch (error) {
+              Alert.alert("Error", "Failed to delete expense");
+            } finally {
+              setDeleting(false);
+            }
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <>
@@ -44,11 +85,14 @@ export default function ExpenseCard({ expense }: any) {
 
             <View>
               <Text style={styles.title}>
-                {expense.paidByName.split(" ")[0]}
+                {expense.paidByName.split(" ")[0]} • {expense.category}
               </Text>
               <Text style={styles.sub}>
                 {expense.category} •{" "}
                 {expense.expenseDate?.toDate().toDateString()}
+              </Text>
+              <Text style={styles.sub}>
+                Added On: {expense.createdAt?.toDate().toDateString()}
               </Text>
             </View>
           </View>
@@ -74,11 +118,30 @@ export default function ExpenseCard({ expense }: any) {
               label="Date"
               value={expense.expenseDate?.toDate().toDateString()}
             />
+            <DetailRow
+              label="Added Date"
+              value={expense.createdAt?.toDate().toDateString()}
+            />
 
             <DetailRow
               label="Note"
               value={expense.note ? expense.note : "No additional notes"}
             />
+
+            <TouchableOpacity
+              style={[styles.deleteButton, deleting && styles.deleteDisabled]}
+              onPress={deleteExpense}
+              disabled={deleting}
+            >
+              {deleting ? (
+                <ActivityIndicator size="small" color="#EF4444" />
+              ) : (
+                <>
+                  <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                  <Text style={styles.deleteText}>Delete Expense</Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
         </Pressable>
       </Modal>
@@ -159,6 +222,9 @@ const styles = StyleSheet.create({
     color: "#374151",
     marginTop: 4,
   },
+  deleteDisabled: {
+    opacity: 0.6,
+  },
   detailRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -183,5 +249,22 @@ const styles = StyleSheet.create({
 
   noteBlock: {
     marginTop: 12,
+  },
+  deleteButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#FCA5A5",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+
+  deleteText: {
+    color: "#EF4444",
+    fontSize: 14,
+    fontWeight: "600",
   },
 });

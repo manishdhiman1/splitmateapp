@@ -128,7 +128,9 @@ const ExpenseList = ({
           keyExtractor={(item) => item.id}
           refreshing={loadingExpenses}
           onRefresh={fetchExpenses}
-          renderItem={({ item }) => <ExpenseCard expense={item} />}
+          renderItem={({ item }) => (
+            <ExpenseCard expense={item} fetchExpenses={fetchExpenses} />
+          )}
           contentContainerStyle={{ paddingBottom: 10 }}
           onEndReached={fetchMoreExpenses}
           onEndReachedThreshold={0.5}

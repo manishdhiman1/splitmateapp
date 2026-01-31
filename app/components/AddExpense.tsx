@@ -1,21 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, PanResponder, Text, View } from "react-native";
-
 import { Ionicons } from "@expo/vector-icons";
-import {
-  Animated,
-  Keyboard,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-} from "react-native";
-
-import { auth, db } from "@/firebase/firebaseConfig";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import {
   addDoc,
   collection,
@@ -23,108 +7,99 @@ import {
   serverTimestamp,
   updateDoc,
 } from "firebase/firestore";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Animated,
+  Easing,
+  Keyboard,
+  Modal,
+  PanResponder,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import Toast from "react-native-toast-message";
 
+import { auth, db } from "@/firebase/firebaseConfig";
 import { useAppStore } from "@/store/app.store";
 import sendExpensePush from "@/utils/notification";
-import DateTimePicker from "@react-native-community/datetimepicker";
 
-const AddExpenses = (expenseData: any) => {
-  const { showExpenseModal, closeModal, fetchExpenses } = expenseData;
-  const [amount, setAmount] = useState("0");
+const CATEGORIES = ["Groceries", "Veg", "Dinner", "Other"];
+
+export default function AddExpenses({
+  showExpenseModal,
+  closeModal,
+  fetchExpenses,
+}: any) {
   const slideAnim = useRef(new Animated.Value(0)).current;
   const { roomId, room, roommate } = useAppStore();
+
+  const [amount, setAmount] = useState("");
+  const [category, setCategory] = useState("Groceries");
+  const [note, setNote] = useState("");
   const [expenseDate, setExpenseDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
-
-  const formatDate = (date: Date) => {
-    const today = new Date();
-    const isToday = date.toDateString() === today.toDateString();
-
-    if (isToday) return "Today";
-
-    return date.toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  };
+  const [saving, setSaving] = useState(false);
+  const [addMore, setAddMore] = useState(false);
+  const amountInputRef = useRef<TextInput>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
   useEffect(() => {
     if (showExpenseModal) {
       Animated.timing(slideAnim, {
         toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }).start();
+        duration: 300,
+        useNativeDriver: false,
+      }).start(() => {
+        // wait for modal + animation to finish
+        setTimeout(() => {
+          amountInputRef.current?.focus();
+        }, 100);
+      });
     }
   }, [showExpenseModal]);
 
   const handleClose = () => {
+    Keyboard.dismiss();
     Animated.timing(slideAnim, {
       toValue: -1,
-      duration: 500,
-      useNativeDriver: true,
-    }).start(({ finished }) => {
-      if (finished) {
-        closeModal();
-      }
-    });
+      duration: 300,
+      useNativeDriver: false,
+    }).start(() => closeModal());
   };
 
   const panResponder = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gesture) => gesture.dy > 5,
-
-      onPanResponderMove: (_, gesture) => {
-        console.log("start");
-        if (gesture.dy > 0) {
-          slideAnim.setValue(1 - gesture.dy / 400);
-        }
+      onMoveShouldSetPanResponder: (_, g) => g.dy > 10,
+      onPanResponderMove: (_, g) => {
+        if (g.dy > 0) slideAnim.setValue(1 - g.dy / 400);
       },
-
-      onPanResponderRelease: (_, gesture) => {
-        console.log("end");
-        if (gesture.dy > 120) {
-          handleClose();
-        } else {
-          Animated.spring(slideAnim, {
-            toValue: 1,
-            useNativeDriver: true,
-          }).start();
-        }
+      onPanResponderRelease: (_, g) => {
+        g.dy > 120
+          ? handleClose()
+          : Animated.spring(slideAnim, {
+              toValue: 1,
+              useNativeDriver: false,
+            }).start();
       },
     }),
   ).current;
 
-  const onNumberPress = (num: string) => {
-    setAmount((prev) => (prev === "0" ? num : prev + num));
-  };
-
-  const onBackspace = () => {
-    setAmount((prev) => (prev.length <= 1 ? "0" : prev.slice(0, -1)));
-  };
-
-  const [category, setCategory] = useState("Groceries");
-  const [note, setNote] = useState("");
-  const [savingExpense, setSavingExpense] = useState(false);
-
+  /* ---------- Save Expense ---------- */
   const saveExpense = async () => {
-    if (amount === "0") {
-      Toast.show({
-        type: "error",
-        text1: "Invalid amount",
-        text2: "Please enter a valid amount",
-      });
+    if (!amount || amount === "0") {
+      Toast.show({ type: "error", text1: "Enter valid amount" });
       return;
     }
 
-    if (!note) {
-      Toast.show({
-        type: "error",
-        text1: "Invalid Note",
-        text2: "Please enter a valid Note",
-      });
+    if (category === "Other" && !note.trim()) {
+      Toast.show({ type: "error", text1: "Please add a note" });
       return;
     }
 
@@ -132,248 +107,248 @@ const AddExpenses = (expenseData: any) => {
     if (!user) return;
 
     try {
-      setSavingExpense(true);
-      // 1️⃣ Add expense (TOP-LEVEL collection)
+      setSaving(true);
+
       await addDoc(collection(db, "expenses"), {
-        roomId: roomId,
+        roomId,
         amount: Number(amount),
         category,
         note,
         paidBy: user.uid,
+        paidByName: user.displayName,
+        paidByEmail: user.email,
         cycleNumber: room.cycleNumber || null,
         cycleUserId: room.activeUserId || null,
-        paidByEmail: user.email,
-        paidByName: user.displayName,
-        expenseDate: expenseDate,
+        expenseDate,
         createdAt: serverTimestamp(),
-        date: serverTimestamp(),
       });
 
-      // 2️⃣ Update room summary
       roomId &&
         (await updateDoc(doc(db, "rooms", roomId), {
           lastExpenseAt: serverTimestamp(),
         }));
 
-      Toast.show({
-        type: "success",
-        text1: "Expense added successfully",
-      });
-
-      const token = roommate.notifyToken;
-
       sendExpensePush(
-        [token],
-        `${user.displayName} added ₹${amount} for ${note}`,
+        [roommate?.notifyToken],
+        `${user.displayName} added ₹${amount}`,
       );
 
-      // Reset state
+      Toast.show({ type: "success", text1: "Expense added" });
       fetchExpenses();
-      setAmount("0");
-      setCategory("Food");
+
+      setAmount("");
+      setCategory("Groceries");
       setNote("");
-      closeModal();
-      return;
-    } catch (error) {
-      console.error(error);
-      Toast.show({
-        type: "error",
-        text1: "Failed to add expense",
-      });
+      setExpenseDate(new Date());
+      if (!addMore) {
+        handleClose();
+      }
+    } catch (e) {
+      Toast.show({ type: "error", text1: "Failed to save expense" });
     } finally {
-      setSavingExpense(false);
+      setSaving(false);
     }
   };
 
+  const paddingAnim = useRef(new Animated.Value(40)).current;
+  useEffect(() => {
+    const showSub = Keyboard.addListener("keyboardDidShow", (e) => {
+      setIsKeyboardOpen(true);
+      Animated.timing(paddingAnim, {
+        toValue: e.endCoordinates.height + 30,
+        duration: 100,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: false,
+      }).start();
+    });
+
+    const hideSub = Keyboard.addListener("keyboardDidHide", () => {
+      setIsKeyboardOpen(false);
+      Animated.timing(paddingAnim, {
+        toValue: 40,
+        duration: 100,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: false,
+      }).start();
+    });
+
+    Keyboard.addListener("keyboardDidShow", () => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
   return (
-    <Modal visible={showExpenseModal} transparent animationType="none">
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+    <Modal
+      visible={showExpenseModal}
+      transparent
+      onRequestClose={() => {
+        if (isKeyboardOpen) {
+          Keyboard.dismiss();
+          return;
+        }
+
+        handleClose();
+      }}
+    >
+      <Pressable
+        style={styles.backdrop}
+        onPress={() => {
+          Keyboard.dismiss();
+          handleClose();
+        }}
+      />
+
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={[
+          styles.sheet,
+          {
+            paddingBottom: paddingAnim,
+            transform: [
+              {
+                translateY: slideAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [500, 0],
+                }),
+              },
+            ],
+          },
+        ]}
       >
-        {/* Backdrop */}
-        <Pressable
-          style={styles.backdrop}
-          onPress={() => {
-            Keyboard.dismiss();
-            handleClose();
-          }}
-        />
-
-        {/* Bottom Sheet */}
-        <Animated.View
-          {...panResponder.panHandlers}
-          style={[
-            styles.sheet,
-            {
-              transform: [
-                {
-                  translateY: slideAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [500, 0],
-                  }),
-                },
-              ],
-            },
-          ]}
+        <ScrollView
+          ref={scrollRef}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            {/* Handle */}
-            <View style={styles.handle} />
+          <View style={styles.handle} />
 
-            {/* Header */}
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Add New Expense</Text>
-              <Ionicons name="close" size={20} onPress={handleClose} />
-            </View>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.title}>Add Expense</Text>
+            <Ionicons name="close" size={20} onPress={handleClose} />
+          </View>
 
-            {/* Category */}
-            <Text style={styles.sheetLabel}>Category</Text>
+          {/* Categories */}
+          <View style={styles.categoryRow}>
+            {CATEGORIES.map((c) => (
+              <TouchableOpacity
+                key={c}
+                style={[
+                  styles.category,
+                  category === c && styles.categoryActive,
+                ]}
+                onPress={() => setCategory(c)}
+              >
+                <Text style={{ color: category === c ? "#FFF" : "#4F46E5" }}>
+                  {c}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
-            <View style={styles.categoryRow}>
-              {["Groceries", "Rent", "Travel", "Other"].map((item) => (
-                <TouchableOpacity
-                  key={item}
-                  style={[
-                    styles.categoryItem,
-                    category === item && styles.categoryItemActive,
-                  ]}
-                  onPress={() => setCategory(item)}
-                >
-                  <Ionicons
-                    name={
-                      item === "Groceries"
-                        ? "fast-food"
-                        : item === "Rent"
-                          ? "home"
-                          : item === "Travel"
-                            ? "airplane"
-                            : "flash"
-                    }
-                    size={18}
-                    color={category === item ? "#FFFFFF" : "#4F46E5"}
-                  />
-                  <Text
-                    style={[
-                      styles.categoryText,
-                      category === item && { color: "#FFFFFF" },
-                    ]}
-                  >
-                    {item}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Input */}
+          {/* Note only for Other */}
+          {category === "Other" && (
             <TextInput
               placeholder="What was this for?"
               value={note}
-              onChangeText={setNote}
               multiline
+              onChangeText={setNote}
               style={styles.input}
               placeholderTextColor="#9CA3AF"
             />
+          )}
 
-            {/* Date */}
-            <View style={styles.dateRow}>
-              {/* Date */}
-              <Text>Date: </Text>
-              <TouchableOpacity
-                style={styles.dateRow}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <Ionicons name="calendar-outline" size={18} />
-                <Text style={styles.dateText}>{formatDate(expenseDate)}</Text>
-              </TouchableOpacity>
-            </View>
+          {/* Date */}
+          <TouchableOpacity
+            style={styles.dateRow}
+            onPress={() => setShowDatePicker(true)}
+          >
+            <Ionicons name="calendar-outline" size={18} />
+            <Text style={styles.dateText}>{expenseDate.toDateString()}</Text>
+          </TouchableOpacity>
 
-            {showDatePicker && (
-              <DateTimePicker
-                value={expenseDate}
-                mode="date"
-                display={Platform.OS === "ios" ? "spinner" : "default"}
-                maximumDate={new Date()} // no future dates
-                onChange={(event, selectedDate) => {
-                  setShowDatePicker(false);
-                  if (selectedDate) {
-                    setExpenseDate(selectedDate);
-                  }
-                }}
-              />
+          {showDatePicker && (
+            <DateTimePicker
+              value={expenseDate}
+              mode="date"
+              maximumDate={new Date()}
+              onChange={(_, d) => {
+                setShowDatePicker(false);
+                d && setExpenseDate(d);
+              }}
+            />
+          )}
+
+          {/* Amount */}
+          {/* Amount Input */}
+          <View style={styles.amountRow}>
+            <Text style={styles.currency}>₹</Text>
+            <TextInput
+              ref={amountInputRef}
+              value={amount}
+              onChangeText={(text) => {
+                // allow only numbers
+                const cleaned = text.replace(/[^0-9]/g, "");
+                setAmount(cleaned === "" ? "" : cleaned);
+              }}
+              keyboardType="numeric"
+              inputMode="numeric"
+              placeholder="0"
+              placeholderTextColor="#9CA3AF"
+              style={styles.amountInput}
+              autoFocus={false}
+            />
+          </View>
+
+          {/* Add More */}
+          <TouchableOpacity
+            style={styles.addMore}
+            onPress={() => setAddMore(!addMore)}
+          >
+            <Ionicons
+              name={addMore ? "checkbox" : "square-outline"}
+              size={18}
+              color="#4F46E5"
+            />
+            <Text style={styles.addMoreText}>Add another expense</Text>
+          </TouchableOpacity>
+
+          {/* Save */}
+          <TouchableOpacity
+            style={[styles.saveButton, saving && { opacity: 0.6 }]}
+            disabled={saving}
+            onPress={saveExpense}
+          >
+            {saving ? (
+              <ActivityIndicator color="#FFF" />
+            ) : (
+              <Text style={styles.saveText}>Save</Text>
             )}
-
-            {/* Amount */}
-            <View style={styles.amountRow}>
-              <Text style={styles.currency}>₹</Text>
-              <Text style={styles.amount}>{amount}</Text>
-            </View>
-            <View style={styles.keypad}>
-              {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((n) => (
-                <TouchableOpacity
-                  key={n}
-                  style={styles.key}
-                  onPress={() => onNumberPress(n)}
-                >
-                  <Text style={styles.keyText}>{n}</Text>
-                </TouchableOpacity>
-              ))}
-
-              <View style={styles.key} />
-
-              <TouchableOpacity
-                style={styles.key}
-                onPress={() => onNumberPress("0")}
-              >
-                <Text style={styles.keyText}>0</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.key} onPress={onBackspace}>
-                <Ionicons name="backspace-outline" size={22} />
-              </TouchableOpacity>
-            </View>
-            {/* Save */}
-            <TouchableOpacity
-              style={[styles.saveButton, savingExpense && { opacity: 0.6 }]}
-              onPress={saveExpense}
-              disabled={savingExpense}
-            >
-              {savingExpense ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.saveText}>Save Expense</Text>
-              )}
-            </TouchableOpacity>
-          </ScrollView>
-        </Animated.View>
-      </KeyboardAvoidingView>
+          </TouchableOpacity>
+        </ScrollView>
+      </Animated.View>
     </Modal>
   );
-};
+}
 
-export default AddExpenses;
-
+/* ---------- Styles ---------- */
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.35)",
-  },
-  categoryItemActive: {
-    backgroundColor: "#4F46E5",
-  },
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)" },
   sheet: {
     position: "absolute",
     bottom: 0,
     width: "100%",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#FFF",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,
+    paddingBottom: 40,
   },
-
   handle: {
     width: 40,
     height: 4,
@@ -382,120 +357,68 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     marginBottom: 12,
   },
-
-  sheetHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-
-  sheetTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#111827",
-  },
-
-  amountRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "flex-end",
-    marginBottom: 20,
-  },
-
-  currency: {
-    fontSize: 22,
-    marginRight: 4,
-    color: "#4F46E5",
-  },
-
-  amount: {
-    fontSize: 36,
-    fontWeight: "700",
-    color: "#4F46E5",
-  },
-
-  sheetLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#6B7280",
-    marginBottom: 8,
-  },
-
-  categoryRow: {
+  header: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 16,
   },
 
-  categoryItem: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+  title: { fontSize: 16, fontWeight: "700" },
+  categoryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 14,
+  },
+  category: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 20,
     backgroundColor: "#EEF2FF",
-    alignItems: "center",
-    justifyContent: "center",
   },
-
-  categoryText: {
-    fontSize: 10,
-    marginTop: 4,
-    color: "#4F46E5",
-  },
-
+  categoryActive: { backgroundColor: "#4F46E5" },
   input: {
     backgroundColor: "#F3F4F6",
     borderRadius: 12,
-    padding: 14,
-    fontSize: 14,
-    marginBottom: 14,
+    padding: 12,
+    marginBottom: 12,
+    color: "black",
   },
-
   dateRow: {
     flexDirection: "row",
     alignItems: "center",
-    // paddingBottom:
-    // marginBottom: 20,
+    gap: 6,
+    marginBottom: 12,
   },
+  dateText: { color: "#4F46E5", fontWeight: "600" },
 
-  dateText: {
-    marginLeft: 6,
+  amountRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginVertical: 0,
+    alignContent: "center",
+    alignItems: "center",
+  },
+  currency: { fontSize: 30, color: "#4F46E5" },
+  amount: { fontSize: 36, fontWeight: "700", color: "#4F46E5" },
+  amountInput: {
+    fontSize: 36,
+    fontWeight: "700",
     color: "#4F46E5",
-    fontWeight: "600",
+    textAlign: "center",
+    minWidth: 60,
   },
-
+  addMore: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  addMoreText: { color: "#4F46E5", fontWeight: "600", fontSize: 13 },
   saveButton: {
     backgroundColor: "#4F46E5",
     paddingVertical: 16,
     borderRadius: 14,
     alignItems: "center",
   },
-
-  saveText: {
-    color: "#FFFFFF",
-    fontWeight: "700",
-    fontSize: 15,
-  },
-  keypad: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    marginBottom: 20,
-  },
-
-  key: {
-    width: "30%",
-    height: 56,
-    borderRadius: 14,
-    backgroundColor: "#F3F4F6",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
-  },
-
-  keyText: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#111827",
-  },
+  saveText: { color: "#FFF", fontWeight: "700", fontSize: 15 },
 });
