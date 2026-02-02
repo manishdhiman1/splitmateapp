@@ -204,9 +204,15 @@ const ExpenseList = ({
           }
         />
       </View>
-      <TouchableOpacity style={styles.fab} onPress={openModal}>
-        <Ionicons name="add" size={28} color="#fff" />
+      <TouchableOpacity
+        activeOpacity={0.85}
+        style={styles.fab}
+        onPress={openModal}
+      >
+        <Ionicons name="add" size={22} color="#fff" />
+        <Text style={styles.fabText}>Add Expense</Text>
       </TouchableOpacity>
+
       <AddExpenses
         fetchExpenses={fetchExpenses}
         showExpenseModal={showExpenseModal}
@@ -234,8 +240,12 @@ const styles = StyleSheet.create({
     flexDirection: "column",
     // justifyContent: "space-between",
     // alignItems: "center",
-    // marginBottom: 40,
-    height: 300,
+    // marginBottom: 300,
+    minHeight: 250,
+    maxHeight: 350,
+    // position: "relative",
+    // bottom: 100,
+    // height: 500,
   },
 
   activityLeft: {
@@ -247,13 +257,30 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 20,
     bottom: 20,
+
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+
     backgroundColor: "#4F46E5",
-    width: 56,
+    paddingHorizontal: 16,
     height: 56,
     borderRadius: 28,
-    alignItems: "center",
-    justifyContent: "center",
+
+    // Android shadow
     elevation: 6,
+
+    // iOS shadow
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+  },
+
+  fabText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
   },
 
   activityIcon: {
