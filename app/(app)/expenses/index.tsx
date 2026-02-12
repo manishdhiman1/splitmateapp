@@ -4,7 +4,6 @@ import {
   StyleSheet,
   Text,
   ToastAndroid,
-  TouchableOpacity,
   View,
 } from "react-native";
 
@@ -12,32 +11,82 @@ import ExpenseCard from "@/app/components/ExpenseCard";
 import { auth, db } from "@/firebase/firebaseConfig";
 import { useAppStore } from "@/store/app.store";
 import sendExpensePush from "@/utils/notification";
-import { Ionicons } from "@expo/vector-icons";
 import {
   collection,
   getDocs,
   limit,
   orderBy,
   query,
+  startAfter,
   where,
 } from "firebase/firestore";
 import { useEffect, useState } from "react";
-import AddExpenses from "./AddExpense";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-const ExpenseList = ({
-  fetchCycleTotal,
-  loadingExpenses,
-  setLoadingExpenses,
-}: any) => {
+const ExpenseList = () => {
   const { room, roomId, roommate } = useAppStore();
   const [showExpenseModal, setShowExpenseModal] = useState(false);
-
+  const [loadingExpenses, setLoadingExpenses] = useState(false);
   const [expenses, setExpenses] = useState<any[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const [lastDoc, setLastDoc] = useState<any>(null);
   const [hasMore, setHasMore] = useState(true);
   const user = auth.currentUser;
-  const PAGE_SIZE = 50;
+  const PAGE_SIZE = 100;
+  const [cycleSummary, setCycleSummary] = useState<any[]>([]);
+
+  const fetchLast3Cycles = async () => {
+    if (!roomId || !roommate?.uid || !user?.uid) return;
+
+    try {
+      const q = query(
+        collection(db, "expenses"),
+        where("roomId", "==", roomId),
+        orderBy("cycleNumber", "desc"),
+        limit(20), // get enough to extract 3 cycles
+      );
+
+      const snap = await getDocs(q);
+
+      const allExpenses = snap.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      // Get unique cycle numbers (descending)
+      const uniqueCycles = [
+        ...new Set(allExpenses.map((e: any) => e.cycleNumber)),
+      ].slice(0, 3);
+
+      const summary = uniqueCycles.map((cycle) => {
+        const cycleExpenses = allExpenses.filter(
+          (e: any) => e.cycleNumber === cycle,
+        );
+
+        let myTotal = 0;
+        let roommateTotal = 0;
+
+        cycleExpenses.forEach((exp: any) => {
+          if (exp.paidBy === user.uid) {
+            myTotal += exp.amount;
+          } else {
+            roommateTotal += exp.amount;
+          }
+        });
+
+        return {
+          cycleNumber: cycle,
+          myTotal,
+          roommateTotal,
+          total: myTotal + roommateTotal,
+        };
+      });
+
+      setCycleSummary(summary);
+    } catch (error) {
+      console.error("Cycle summary error:", error);
+    }
+  };
 
   const openModal = () => {
     setShowExpenseModal(true);
@@ -78,13 +127,46 @@ const ExpenseList = ({
     } finally {
       setLoadingExpenses(false);
       // console.log("room", room);
-      fetchCycleTotal(room);
     }
   };
 
   useEffect(() => {
     fetchExpenses();
+    fetchLast3Cycles();
   }, [roomId]);
+
+  const fetchMoreExpenses = async () => {
+    if (!roomId || !lastDoc || !hasMore || loadingMore) return;
+
+    try {
+      setLoadingMore(true);
+
+      const q = query(
+        collection(db, "expenses"),
+        where("roomId", "==", roomId),
+        // where("roomId", "==", "sdfsdf"),
+        orderBy("createdAt", "desc"),
+        startAfter(lastDoc),
+        limit(PAGE_SIZE),
+      );
+
+      const snap = await getDocs(q);
+
+      const list = snap.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      setExpenses((prev) => [...prev, ...list]);
+      // console.log("expenses", expenses);
+      setLastDoc(snap.docs[snap.docs.length - 1] || null);
+      setHasMore(snap.docs.length === 10);
+    } catch (error) {
+      console.error("Fetch more error:", error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const sendReminder = () => {
     if (roommate?.notifyToken) {
@@ -103,24 +185,63 @@ const ExpenseList = ({
   };
 
   return (
-    <>
+    <SafeAreaView style={styles.container}>
       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
         <Text style={styles.sectionTitle}>Recent Activity</Text>
-        <TouchableOpacity style={styles.expenseButton} onPress={sendReminder}>
-          <Text style={styles.expenseButtonText}>Send Reminder</Text>
-        </TouchableOpacity>
       </View>
       {/* Recent Activity */}
+      <View style={{ marginBottom: 16 }}>
+        <FlatList
+          data={cycleSummary}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(item) => item.cycleNumber.toString()}
+          contentContainerStyle={{ gap: 14, marginBottom: 20 }}
+          renderItem={({ item }) => {
+            const balance = item.myTotal - item.roommateTotal;
+            const isPositive = balance > 0;
+
+            return (
+              <View style={styles.cycleCard}>
+                <View style={styles.cycleHeader}>
+                  <Text style={styles.cycleNumber}>
+                    Cycle {item.cycleNumber}
+                  </Text>
+                </View>
+
+                <View style={styles.cycleRow}>
+                  <View>
+                    <Text style={styles.cycleLabel}>You</Text>
+                    <Text style={styles.cycleAmount}>₹{item.myTotal}</Text>
+                  </View>
+
+                  <View>
+                    <Text style={styles.cycleLabel}>{roommate?.name}</Text>
+                    <Text style={styles.cycleAmount}>
+                      ₹{item.roommateTotal}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            );
+          }}
+        />
+      </View>
+
       <View style={styles.activityCard}>
         <FlatList
           data={expenses}
           keyExtractor={(item) => item.id}
           refreshing={loadingExpenses}
-          onRefresh={fetchExpenses}
+          onRefresh={() => {
+            fetchExpenses();
+            fetchLast3Cycles();
+          }}
           renderItem={({ item }) => (
             <ExpenseCard expense={item} fetchExpenses={fetchExpenses} />
           )}
           contentContainerStyle={{ paddingBottom: 10 }}
+          onEndReached={fetchMoreExpenses}
           onEndReachedThreshold={0.5}
           ListEmptyComponent={
             loadingExpenses ? (
@@ -192,21 +313,7 @@ const ExpenseList = ({
           }
         />
       </View>
-      <TouchableOpacity
-        activeOpacity={0.85}
-        style={styles.fab}
-        onPress={openModal}
-      >
-        <Ionicons name="add" size={22} color="#fff" />
-        <Text style={styles.fabText}>Add Expense</Text>
-      </TouchableOpacity>
-
-      <AddExpenses
-        fetchExpenses={fetchExpenses}
-        showExpenseModal={showExpenseModal}
-        closeModal={closeModal}
-      />
-    </>
+    </SafeAreaView>
   );
 };
 
@@ -219,6 +326,11 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     color: "#111827",
   },
+  container: {
+    flex: 1,
+    backgroundColor: "#F9FAFB",
+    paddingHorizontal: 20,
+  },
 
   activityCard: {
     backgroundColor: "#FFFFFF",
@@ -229,11 +341,12 @@ const styles = StyleSheet.create({
     // justifyContent: "space-between",
     // alignItems: "center",
     // marginBottom: 300,
-    minHeight: 250,
-    maxHeight: 350,
     // position: "relative",
     // bottom: 100,
     // height: 500,
+    // minHeight: 250,
+    // maxHeight: 600,
+    paddingBottom: 180,
   },
 
   activityLeft: {
@@ -309,6 +422,68 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.35)",
+  },
+
+  cycleTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 12,
+    color: "#111827",
+  },
+
+  cycleCard: {
+    width: 240,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+
+  cycleHeader: {
+    backgroundColor: "#EEF2FF",
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    marginBottom: 14,
+  },
+
+  cycleNumber: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#4F46E5",
+  },
+
+  cycleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+
+  cycleLabel: {
+    fontSize: 11,
+    color: "#6B7280",
+  },
+
+  cycleAmount: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#111827",
+  },
+
+  cycleDivider: {
+    height: 1,
+    backgroundColor: "#E5E7EB",
+    marginVertical: 8,
+  },
+
+  balanceText: {
+    fontSize: 12,
+    fontWeight: "600",
   },
 
   sheet: {

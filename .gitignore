@@ -41,6 +41,6 @@ app-example
 # generated native folders
 /ios
 /android
-google-services.json
+# google-services.json
 .env
 credentials.json

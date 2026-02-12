@@ -146,7 +146,7 @@ export default function StartRoomScreen(roomData: any) {
       />
 
       {/* Roommate Email */}
-      <Text style={styles.label}>Roommate's Email</Text>
+      <Text style={styles.label}>Roommate&apos;s Email</Text>
       <TextInput
         placeholder="email@example.com"
         placeholderTextColor="#9CA3AF"

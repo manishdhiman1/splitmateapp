@@ -1,0 +1,92 @@
+{
+  "project_info": {
+    "project_number": "760399815016",
+    "project_id": "splitmate-c2b4c",
+    "storage_bucket": "splitmate-c2b4c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:760399815016:android:da64a531ae99f3e14c76dd",
+        "android_client_info": {
+          "package_name": "com.anonymous.SplitMate"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "760399815016-1stc4fl5qn7guu8oqgvc7ntuucekqtjv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.anonymous.SplitMate",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "760399815016-pvion1p1redgn5904m2n4uejsdlb3qj2.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB1Eu2bzzNfN0hmE-zd-AIzWkNQWRBagkE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "760399815016-7u550v82lj4kae3r91gl4s5cj8ipkk15.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:760399815016:android:f052311bb74721694c76dd",
+        "android_client_info": {
+          "package_name": "com.softscale.livingexpense"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "760399815016-09dqneo9n1p4sv3813lsgaa6mosod4cl.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.softscale.livingexpense",
+            "certificate_hash": "5e7e50e1f6d952f8fdd80fd019f3a7bd322e1ca7"
+          }
+        },
+        {
+          "client_id": "760399815016-q0kug8db3gaeck4ikf7k9vsnvivfain7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.softscale.livingexpense",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "760399815016-pvion1p1redgn5904m2n4uejsdlb3qj2.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB1Eu2bzzNfN0hmE-zd-AIzWkNQWRBagkE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "760399815016-7u550v82lj4kae3r91gl4s5cj8ipkk15.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

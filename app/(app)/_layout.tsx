@@ -27,7 +27,7 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{ headerShown: false }}
-      // initialRouteName="reminders/index"
+      // initialRouteName="expenses/index"
     >
       <Tabs.Screen
         name="(home)/index"
@@ -38,7 +38,15 @@ export default function TabLayout() {
           ),
         }}
       />
-
+      <Tabs.Screen
+        name="expenses/index"
+        options={{
+          title: "Expenses",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="cash" size={size} color={color} />
+          ),
+        }}
+      />
       <Tabs.Screen
         name="room/index"
         options={{

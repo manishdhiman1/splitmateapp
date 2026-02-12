@@ -76,6 +76,7 @@ export default function SessionProvider({ children }: PropsWithChildren) {
       webClientId: GOOGLE_CLIENT_ID,
       profileImageSize: 500,
     });
+    // console.log("GOOGLE_CLIENT_ID", GOOGLE_CLIENT_ID);
   }, []);
 
   useEffect(() => {
@@ -138,7 +139,7 @@ export default function SessionProvider({ children }: PropsWithChildren) {
             break;
 
           default:
-            console.log("erorr", statusCodes);
+            console.log("error", statusCodes);
             Toast.show({
               type: "error",
               text1: "Login failed",
