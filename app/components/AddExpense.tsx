@@ -91,6 +91,9 @@ export default function AddExpenses({
     }),
   ).current;
 
+  const activeCycle = room?.cycleNumber || 0;
+  const futureCycle = activeCycle + 1;
+
   /* ---------- Save Expense ---------- */
   const saveExpense = async () => {
     if (!amount || amount === "0") {
@@ -109,6 +112,10 @@ export default function AddExpenses({
     try {
       setSaving(true);
 
+      // Decide which cycle this expense belongs to
+      const assignedCycle =
+        user.uid === room.activeUserId ? activeCycle : futureCycle;
+
       await addDoc(collection(db, "expenses"), {
         roomId,
         amount: Number(amount),
@@ -117,8 +124,11 @@ export default function AddExpenses({
         paidBy: user.uid,
         paidByName: user.displayName,
         paidByEmail: user.email,
-        cycleNumber: room.cycleNumber || null,
-        cycleUserId: room.activeUserId || null,
+
+        cycleNumber: assignedCycle,
+        cycleUserId:
+          user.uid === room.activeUserId ? room.activeUserId : user.uid,
+
         expenseDate,
         createdAt: serverTimestamp(),
       });

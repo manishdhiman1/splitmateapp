@@ -60,6 +60,7 @@ export default function HomeScreen() {
   const [cycleTotal, setCycleTotal] = useState(0);
   const [rcycleTotal, setrCycleTotal] = useState(0);
   const [cycleTotalLoading, setCycleTotalLoading] = useState(false);
+  const latestCycle = room?.cycleNumber || 0;
 
   useEffect(() => {
     if (!room || !user) {
@@ -75,47 +76,49 @@ export default function HomeScreen() {
   }, [room, user]);
 
   const fetchCycleTotal = async (room: any) => {
-    if (!roomId || !room?.activeUserId || !room?.cycleStartAt) {
+    if (!roomId || !room?.cycleNumber || !user?.uid || !roommateId) {
       setCycleTotal(0);
+      setrCycleTotal(0);
       return;
     }
+
     try {
       setCycleTotalLoading(true);
 
-      const myQuery = query(
+      const activeCycle = room.cycleNumber;
+      const futureCycle = activeCycle + 1;
+
+      // Fetch both cycles together
+      const q = query(
         collection(db, "expenses"),
         where("roomId", "==", roomId),
-        where("cycleUserId", "==", room.activeUserId),
-        where("paidBy", "==", user?.uid),
-        where("createdAt", ">=", room.cycleStartAt),
+        where("cycleNumber", "in", [activeCycle, futureCycle]),
       );
 
-      const roommateQuery = query(
-        collection(db, "expenses"),
-        where("roomId", "==", roomId),
-        where("paidBy", "==", roommateId),
-        where("cycleUserId", "==", room.activeUserId),
-        where("createdAt", ">=", room.cycleStartAt),
-      );
-
-      const mySnap = await getDocs(myQuery);
-      const roommateSnap = await getDocs(roommateQuery);
+      const snap = await getDocs(q);
 
       let myTotal = 0;
-      mySnap.forEach((doc) => {
-        // console.log("doc", doc.data());
-        myTotal += Number(doc.data().amount || 0);
-      });
+      let roommateTotal = 0;
 
-      // console.log("myTotal", mySnap.size);
+      snap.forEach((doc) => {
+        const data = doc.data();
+        if (!data?.amount || !data?.cycleNumber) return;
 
-      let rTotal = 0;
-      roommateSnap.forEach((doc) => {
-        rTotal += Number(doc.data().amount || 0);
+        const amount = Number(data.amount) || 0;
+
+        // My total → only from ACTIVE cycle
+        if (data.cycleNumber === activeCycle && data.paidBy === user.uid) {
+          myTotal += amount;
+        }
+
+        // Roommate total → only from FUTURE cycle
+        if (data.cycleNumber === futureCycle && data.paidBy === roommateId) {
+          roommateTotal += amount;
+        }
       });
 
       setCycleTotal(myTotal);
-      setrCycleTotal(rTotal);
+      setrCycleTotal(roommateTotal);
     } catch (error) {
       console.error("Fetch cycle total error:", error);
       setCycleTotal(0);

@@ -34,32 +34,34 @@ const ExpenseList = () => {
   const user = auth.currentUser;
   const PAGE_SIZE = 100;
   const [cycleSummary, setCycleSummary] = useState<any[]>([]);
+  const latestCycle = room?.cycleNumber || 0;
+  const futureCycle = latestCycle + 1;
 
   const fetchLast3Cycles = async () => {
-    if (!roomId || !roommate?.uid || !user?.uid) return;
-
+    if (!roomId || !user?.uid) return;
     try {
+      const cyclesToFetch = [
+        futureCycle,
+        latestCycle,
+        latestCycle - 1,
+        latestCycle - 2,
+      ].filter((c) => c > 0);
+      console.log(cyclesToFetch);
       const q = query(
         collection(db, "expenses"),
         where("roomId", "==", roomId),
-        orderBy("cycleNumber", "desc"),
-        limit(20), // get enough to extract 3 cycles
+        where("cycleNumber", "in", cyclesToFetch),
       );
 
       const snap = await getDocs(q);
 
-      const allExpenses = snap.docs.map((doc) => ({
+      const expenses = snap.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
 
-      // Get unique cycle numbers (descending)
-      const uniqueCycles = [
-        ...new Set(allExpenses.map((e: any) => e.cycleNumber)),
-      ].slice(0, 3);
-
-      const summary = uniqueCycles.map((cycle) => {
-        const cycleExpenses = allExpenses.filter(
+      const summary = cyclesToFetch.map((cycle) => {
+        const cycleExpenses = expenses.filter(
           (e: any) => e.cycleNumber === cycle,
         );
 
@@ -68,9 +70,9 @@ const ExpenseList = () => {
 
         cycleExpenses.forEach((exp: any) => {
           if (exp.paidBy === user.uid) {
-            myTotal += exp.amount;
+            myTotal += Number(exp.amount);
           } else {
-            roommateTotal += exp.amount;
+            roommateTotal += Number(exp.amount);
           }
         });
 
@@ -144,7 +146,6 @@ const ExpenseList = () => {
       const q = query(
         collection(db, "expenses"),
         where("roomId", "==", roomId),
-        // where("roomId", "==", "sdfsdf"),
         orderBy("createdAt", "desc"),
         startAfter(lastDoc),
         limit(PAGE_SIZE),
@@ -200,13 +201,34 @@ const ExpenseList = () => {
           renderItem={({ item }) => {
             const balance = item.myTotal - item.roommateTotal;
             const isPositive = balance > 0;
-
+            const isFuture = item.cycleNumber === futureCycle;
+            const isActive = item.cycleNumber === latestCycle;
             return (
-              <View style={styles.cycleCard}>
+              <View
+                style={[
+                  styles.cycleCard,
+                  isFuture && styles.futureCard,
+                  isActive && styles.activeCard,
+                ]}
+              >
                 <View style={styles.cycleHeader}>
-                  <Text style={styles.cycleNumber}>
-                    Cycle {item.cycleNumber}
-                  </Text>
+                  {!isFuture && !isActive && (
+                    <Text style={styles.cycleNumber}>
+                      Cycle {item.cycleNumber}
+                    </Text>
+                  )}
+
+                  {isFuture && (
+                    <View style={styles.futureBadge}>
+                      <Text style={styles.badgeText}>Future</Text>
+                    </View>
+                  )}
+
+                  {isActive && (
+                    <View style={styles.activeBadge}>
+                      <Text style={styles.badgeText}>Active</Text>
+                    </View>
+                  )}
                 </View>
 
                 <View style={styles.cycleRow}>
@@ -325,6 +347,37 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 10,
     color: "#111827",
+  },
+  futureCard: {
+    backgroundColor: "#FFF4E5",
+    borderColor: "#FFA726",
+    borderWidth: 1,
+  },
+
+  activeCard: {
+    backgroundColor: "#E8F5E9",
+    borderColor: "#4CAF50",
+    borderWidth: 1,
+  },
+
+  futureBadge: {
+    backgroundColor: "#FFA726",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+
+  activeBadge: {
+    backgroundColor: "#4CAF50",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+
+  badgeText: {
+    color: "white",
+    fontSize: 10,
+    fontWeight: "600",
   },
   container: {
     flex: 1,
